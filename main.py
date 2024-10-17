@@ -5,146 +5,108 @@ import sys
 # Инициализация Pygame
 pygame.init()
 
+# Размеры окна
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+
+# Название игры
+pygame.display.set_caption("Игра на выживание")
+
 # Цвета
-white = (255, 255, 255)
-black = (0, 0, 0)
-red = (213, 50, 80)
-green = (0, 255, 0)
-blue = (50, 153, 213)
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLACK = (0, 0, 0)
 
-# Размеры экрана
-screen_width = 600
-screen_height = 400
-screen = pygame.display.set_mode((screen_width, screen_height))
+# Класс игрока
+class Player(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((50, 50))  # Квадрат 50x50
+        self.image.fill(GREEN)
+        self.rect = self.image.get_rect()
+        self.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+        self.speed = 5
 
-# Заголовок окна
-pygame.display.set_caption('Snake Game')
+    def update(self):
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT] and self.rect.left > 0:
+            self.rect.x -= self.speed
+        if keys[pygame.K_RIGHT] and self.rect.right < SCREEN_WIDTH:
+            self.rect.x += self.speed
+        if keys[pygame.K_UP] and self.rect.top > 0:
+            self.rect.y -= self.speed
+        if keys[pygame.K_DOWN] and self.rect.bottom < SCREEN_HEIGHT:
+            self.rect.y += self.speed
 
-# Параметры змейки
-snake_block = 10
-snake_speed = 15
-clock = pygame.time.Clock()
+# Класс врагов
+class Enemy(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((50, 50))  # Квадрат 50x50
+        self.image.fill(RED)
+        self.rect = self.image.get_rect()
+        self.rect.x = random.randint(0, SCREEN_WIDTH - 50)
+        self.rect.y = random.randint(0, SCREEN_HEIGHT - 50)
+        self.speed_x = random.choice([-3, 3])
+        self.speed_y = random.choice([-3, 3])
 
-# Шрифт для отображения текста
-font_style = pygame.font.SysFont("bahnschrift", 25)
-score_font = pygame.font.SysFont("comicsansms", 35)
+    def update(self):
+        self.rect.x += self.speed_x
+        self.rect.y += self.speed_y
 
-# Функция для вывода счета
-def display_score(score):
-    value = score_font.render(f"Ваш счет: {score}", True, white)
-    screen.blit(value, [0, 0])
+        # Поменять направление при столкновении со стенами
+        if self.rect.right >= SCREEN_WIDTH or self.rect.left <= 0:
+            self.speed_x *= -1
+        if self.rect.bottom >= SCREEN_HEIGHT or self.rect.top <= 0:
+            self.speed_y *= -1
 
-# Функция для отображения текста
-def message(msg, color):
-    mesg = font_style.render(msg, True, color)
-    screen.blit(mesg, [screen_width / 6, screen_height / 3])
+# Функция для создания врагов
+def create_enemies(group, count):
+    for _ in range(count):
+        enemy = Enemy()
+        group.add(enemy)
 
-# Функция для игры
+# Основная функция игры
 def game_loop():
-    game_over = False
-    game_close = False
+    player = Player()
+    enemies = pygame.sprite.Group()
+    all_sprites = pygame.sprite.Group()
 
-    # Начальные координаты змейки
-    x1 = screen_width / 2
-    y1 = screen_height / 2
+    all_sprites.add(player)
+    create_enemies(enemies, 5)
+    all_sprites.add(enemies)
 
-    # Направление движения змейки
-    x1_change = 0
-    y1_change = 0
+    clock = pygame.time.Clock()
+    running = True
 
-    # Тело змейки
-    snake_list = []
-    snake_length = 1
-
-    # Координаты еды
-    food_x = round(random.randrange(0, screen_width - snake_block) / 10.0) * 10.0
-    food_y = round(random.randrange(0, screen_height - snake_block) / 10.0) * 10.0
-
-    # Основной игровой цикл
-    while not game_over:
-
-        # Если игра завершена, показываем сообщение
-        while game_close:
-            screen.fill(blue)
-            message("Вы проиграли! Нажмите Q для выхода или C для новой игры", red)
-            display_score(snake_length - 1)
-            pygame.display.update()
-
-            # Обработка событий
-            for event in pygame.event.get():
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_q:
-                        game_over = True
-                        game_close = False
-                    if event.key == pygame.K_c:
-                        game_loop()
-
-        # Обработка событий
+    while running:
+        # Закрытие окна
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                game_over = True
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_LEFT:
-                    x1_change = -snake_block
-                    y1_change = 0
-                elif event.key == pygame.K_RIGHT:
-                    x1_change = snake_block
-                    y1_change = 0
-                elif event.key == pygame.K_UP:
-                    y1_change = -snake_block
-                    x1_change = 0
-                elif event.key == pygame.K_DOWN:
-                    y1_change = snake_block
-                    x1_change = 0
+                pygame.quit()
+                sys.exit()
 
-        # Если змейка выходит за пределы экрана — проигрыш
-        if x1 >= screen_width or x1 < 0 or y1 >= screen_height or y1 < 0:
-            game_close = True
+        # Обновление позиций игрока и врагов
+        all_sprites.update()
 
-        # Обновление координат змейки
-        x1 += x1_change
-        y1 += y1_change
-        screen.fill(black)
+        # Проверка на столкновение игрока с врагами
+        if pygame.sprite.spritecollideany(player, enemies):
+            print("Игра окончена!")
+            running = False
 
-        # Отрисовка еды
-        pygame.draw.rect(screen, green, [food_x, food_y, snake_block, snake_block])
+        # Очистка экрана
+        screen.fill(BLACK)
 
-        # Добавление головы змейки
-        snake_head = []
-        snake_head.append(x1)
-        snake_head.append(y1)
-        snake_list.append(snake_head)
-
-        # Удаление последнего элемента, если змейка не съела еду
-        if len(snake_list) > snake_length:
-            del snake_list[0]
-
-        # Проверка на столкновение с собственным телом
-        for block in snake_list[:-1]:
-            if block == snake_head:
-                game_close = True
-
-        # Отрисовка змейки
-        for block in snake_list:
-            pygame.draw.rect(screen, white, [block[0], block[1], snake_block, snake_block])
-
-        # Проверка на поедание еды
-        if x1 == food_x and y1 == food_y:
-            food_x = round(random.randrange(0, screen_width - snake_block) / 10.0) * 10.0
-            food_y = round(random.randrange(0, screen_height - snake_block) / 10.0) * 10.0
-            snake_length += 1
-
-        # Отображение счета
-        display_score(snake_length - 1)
+        # Отрисовка всех спрайтов
+        all_sprites.draw(screen)
 
         # Обновление экрана
-        pygame.display.update()
+        pygame.display.flip()
 
-        # Установка FPS
-        clock.tick(snake_speed)
-
-    pygame.quit()
-    sys.exit()
+        # Ограничение FPS
+        clock.tick(60)
 
 # Запуск игры
 game_loop()
